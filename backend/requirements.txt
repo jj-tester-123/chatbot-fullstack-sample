@@ -1,0 +1,35 @@
+# FastAPI 및 서버
+fastapi==0.109.0
+uvicorn[standard]==0.27.0
+pydantic==2.5.3
+python-dotenv==1.0.0
+
+# 데이터베이스
+# sqlite3는 Python 내장 모듈이므로 별도 설치 불필요
+
+# RAG 및 벡터 스토어
+chromadb==0.4.22
+sentence-transformers==2.3.1
+posthog==3.4.0  # ChromaDB 0.4.22와 호환되는 버전 (5.x는 호환 안됨)
+
+# LLM 엔진
+# Gemini
+google-generativeai==0.3.2
+
+# 로컬 LLM (Transformers + PyTorch)
+# Gemma 계열 토크나이저/모델 지원을 위해 transformers 버전이 충분히 높아야 합니다.
+# (transformers==4.37.2 에서는 GemmaTokenizer가 없어 로컬 모델 로드가 실패합니다.)
+transformers==4.51.3
+torch==2.2.0
+accelerate==0.26.1
+
+# Hugging Face Hub (모델 다운로드/캐시)
+# transformers 최신 버전과 호환되는 hub 버전 사용
+huggingface-hub==0.35.3
+
+# 일부 토크나이저(특히 sentencepiece 기반) 로드를 위해 명시적으로 포함
+sentencepiece>=0.2.0
+
+# 유틸리티
+numpy==1.26.3
+
