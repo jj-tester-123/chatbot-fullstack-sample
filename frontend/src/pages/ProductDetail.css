@@ -83,6 +83,112 @@
   transform: translateY(-2px);
 }
 
+.purchase-actions {
+  display: grid;
+  grid-template-columns: 110px 1fr 1fr;
+  gap: 0.75rem;
+  margin-top: 1.25rem;
+}
+
+.action-button {
+  border-radius: 12px;
+  padding: 0.9rem 1rem;
+  font-size: 1rem;
+  font-weight: 700;
+  border: 1px solid #e0e0e0;
+}
+
+.action-button.secondary {
+  background: #ffffff;
+  color: #111827;
+}
+
+.action-button.secondary:hover {
+  background: #f5f5f5;
+}
+
+.action-button.primary {
+  border: none;
+  background: linear-gradient(135deg, #2563eb 0%, #7c3aed 100%);
+  color: #ffffff;
+}
+
+.action-button.primary:hover {
+  opacity: 0.95;
+  transform: translateY(-1px);
+}
+
+.floating-chat-button {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  height: 58px;
+  border-radius: 999px;
+  border: none;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: #fff;
+  padding: 0 16px;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.22);
+  cursor: pointer;
+  z-index: 1000;
+}
+
+.chat-fab-icon {
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.18);
+  font-size: 22px;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.chat-fab-label {
+  font-size: 1.05rem;
+  font-weight: 900;
+  letter-spacing: -0.2px;
+  white-space: nowrap;
+}
+
+.floating-chat-button:hover {
+  opacity: 0.95;
+  transform: translateY(-2px);
+}
+
+.floating-chat-button:active {
+  transform: translateY(0);
+}
+
+.floating-chat-button.attention::after {
+  content: '';
+  position: absolute;
+  inset: -6px;
+  border-radius: 999px;
+  border: 2px solid rgba(118, 75, 162, 0.55);
+  animation: chat-fab-pulse 1.4s ease-out infinite;
+}
+
+@keyframes chat-fab-pulse {
+  0% {
+    transform: scale(0.92);
+    opacity: 0.75;
+  }
+  70% {
+    transform: scale(1.08);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(1.08);
+    opacity: 0;
+  }
+}
+
 .product-section {
   margin-top: 3rem;
   padding-top: 2rem;
@@ -241,6 +347,24 @@
 
   .product-spec-grid {
     grid-template-columns: 1fr;
+  }
+
+  .purchase-actions {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .purchase-actions .action-button.primary {
+    grid-column: 1 / -1;
+  }
+
+  /* 모바일에서는 라벨을 숨기고 아이콘 중심으로 */
+  .floating-chat-button {
+    width: 58px;
+    padding: 0;
+    justify-content: center;
+  }
+  .chat-fab-label {
+    display: none;
   }
 }
 

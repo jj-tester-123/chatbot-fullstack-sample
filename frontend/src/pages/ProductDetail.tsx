@@ -29,6 +29,7 @@ export default function ProductDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [chatOpen, setChatOpen] = useState(false);
+  const [chatAttention, setChatAttention] = useState(true);
   const [showAllReviews, setShowAllReviews] = useState(false);
   const [showAllQnas, setShowAllQnas] = useState(false);
 
@@ -89,13 +90,19 @@ export default function ProductDetailPage() {
               {productInfo.price.toLocaleString()}원
             </div>
             <p className="product-description">{productInfo.description}</p>
-            
-            <button
-              className="chat-open-button"
-              onClick={() => setChatOpen(true)}
-            >
-              AI 챗봇에게 물어보기
-            </button>
+
+            {/* 쇼핑몰형 버튼 배치 (동작은 추후 연결) */}
+            <div className="purchase-actions" role="group" aria-label="구매 관련 버튼">
+              <button type="button" className="action-button secondary">
+                찜
+              </button>
+              <button type="button" className="action-button secondary">
+                장바구니
+              </button>
+              <button type="button" className="action-button primary">
+                바로구매
+              </button>
+            </div>
           </div>
         </div>
 
@@ -206,6 +213,22 @@ export default function ProductDetailPage() {
           onClose={() => setChatOpen(false)}
         />
       )}
+
+      {/* 우측 하단 플로팅 챗봇 버튼 */}
+      <button
+        type="button"
+        className={`floating-chat-button ${chatAttention ? 'attention' : ''}`}
+        onClick={() => {
+          setChatAttention(false);
+          setChatOpen(true);
+        }}
+        aria-label="AI 챗봇 열기"
+      >
+        <span className="chat-fab-icon" aria-hidden="true">
+          ?
+        </span>
+        <span className="chat-fab-label">챗봇 문의</span>
+      </button>
     </div>
   );
 }
