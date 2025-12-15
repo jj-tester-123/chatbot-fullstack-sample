@@ -13,7 +13,6 @@ import logging
 from api import products, chat
 from db.database import init_db
 from llm.engine import init_llm_engines
-from rag.retriever import index_all_products
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -51,12 +50,6 @@ async def lifespan(app: FastAPI):
     logger.info("LLM 엔진 초기화 중...")
     await init_llm_engines()
 
-    # 3. RAG 인덱싱 (벡터DB)
-    # - 첫 요청 시 지연을 없애고
-    # - DB와 벡터 인덱스를 동기화(필요 시 clear)하기 위해 앱 시작 시 수행합니다.
-    logger.info("RAG 인덱싱 중...")
-    index_all_products()
-    
     logger.info("애플리케이션 준비 완료")
     yield
     

@@ -107,7 +107,22 @@ CHROMA_PERSIST_DIR=./data/chroma
 - API 키는 소스 코드에 하드코딩하지 마세요
 - Gemini API 키는 [Google AI Studio](https://makersuite.google.com/app/apikey)에서 발급받을 수 있습니다
 
-### 4. 서버 실행
+### 4. (필수) RAG 인덱싱 워커 실행
+
+API 서버는 **인덱싱(임베딩 생성/벡터DB 업서트)을 자동으로 수행하지 않습니다.**
+채팅이 정상적으로 근거를 찾으려면 아래 워커를 최소 1회 실행해 주세요.
+
+```bash
+cd backend
+
+# 전체 재인덱싱(권장)
+./venv/bin/python -m worker.rag_index --clear
+
+# Windows
+venv\Scripts\python -m worker.rag_index --clear
+```
+
+### 5. 서버 실행
 
 ```bash
 # 개발 모드 (자동 리로드)
@@ -127,14 +142,14 @@ venv\Scripts\python -m uvicorn main:app --host 0.0.0.0 --port 8000
 - API 문서: http://localhost:8000/docs
 - 헬스체크: http://localhost:8000/health
 
-### 5. 첫 실행 시 주의사항
+### 6. 첫 실행 시 주의사항
 
 **데이터베이스 초기화**:
 - 첫 실행 시 SQLite 데이터베이스와 더미 데이터가 자동으로 생성됩니다
 - `./data/chatbot.db` 파일이 생성됩니다
 
 **ChromaDB 인덱싱**:
-- 첫 실행 시 상품 텍스트를 임베딩하여 ChromaDB에 저장합니다
+- 상품 텍스트 임베딩 및 ChromaDB 저장은 **워커(`python -m worker.rag_index`)** 가 수행합니다
 - 이후 실행 시에는 저장된 인덱스를 재사용합니다
 
 ## API 엔드포인트

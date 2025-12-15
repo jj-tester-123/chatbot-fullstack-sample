@@ -11,7 +11,24 @@ import logging
 logger = logging.getLogger(__name__)
 
 # 데이터베이스 경로
-DB_PATH = os.getenv("DATABASE_PATH", "./data/chatbot.db")
+def _resolve_db_path() -> str:
+    """
+    SQLite DB 경로를 결정합니다.
+    - 기본값은 backend/data/chatbot.db (실행 cwd에 영향받지 않도록)
+    - DATABASE_PATH 환경변수가 상대경로면 backend 루트 기준으로 해석합니다.
+    """
+    backend_root = Path(__file__).resolve().parents[1]
+    default_path = backend_root / "data" / "chatbot.db"
+    raw = os.getenv("DATABASE_PATH")
+    if not raw:
+        return str(default_path)
+    p = Path(raw)
+    if not p.is_absolute():
+        p = backend_root / p
+    return str(p.resolve())
+
+
+DB_PATH = _resolve_db_path()
 
 
 def get_connection():

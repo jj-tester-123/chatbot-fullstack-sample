@@ -4,7 +4,7 @@
 
 ## ⚡ 최소 설정으로 바로 시작하기
 
-### 1단계: 백엔드 실행 (2분)
+### 1단계: 백엔드 준비 (2분)
 
 ```bash
 # 터미널 1
@@ -25,7 +25,22 @@ pip install -r requirements.txt
 cp env.example .env
 # .env 파일을 열어 GEMINI_API_KEY=your_key_here 입력
 
-# 서버 실행
+```
+
+### 1.5단계: (필수) RAG 인덱싱 워커 실행
+
+API 서버는 **인덱싱(임베딩/벡터DB 업서트)을 자동으로 수행하지 않습니다.**
+채팅이 근거를 찾도록 하려면 아래 워커를 최소 1회 실행해 주세요.
+
+```bash
+cd backend
+python -m worker.rag_index --clear
+```
+
+### 1.6단계: 백엔드 서버 실행
+
+```bash
+cd backend
 uvicorn main:app --reload
 ```
 
@@ -65,8 +80,8 @@ GEMINI_API_KEY=AIzaSy...여기에_키_붙여넣기
 ### 백엔드 첫 실행 (약 2~3분 소요)
 - ✅ SQLite 데이터베이스 자동 생성
 - ✅ 더미 상품 데이터 자동 삽입
-- ✅ ChromaDB 벡터 인덱싱 자동 수행
-- ✅ 임베딩 모델 다운로드 (약 500MB)
+- ✅ (워커 실행 시) ChromaDB 벡터 인덱싱 수행
+- ✅ (워커 실행 시) 임베딩 모델 다운로드 (약 500MB)
 
 ## ✅ 정상 작동 확인
 

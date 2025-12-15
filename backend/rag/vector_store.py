@@ -5,6 +5,7 @@ ChromaDB 벡터 스토어 관리
 - product_id 필터링
 """
 import os
+from pathlib import Path
 import chromadb
 from chromadb.config import Settings
 from typing import List, Dict, Any
@@ -18,7 +19,25 @@ logger = logging.getLogger(__name__)
 _chroma_client = None
 _collection = None
 
-CHROMA_PERSIST_DIR = os.getenv("CHROMA_PERSIST_DIR", "./data/chroma")
+
+def _resolve_persist_dir() -> str:
+    """
+    Chroma 영구 저장 경로를 결정합니다.
+    - 기본값은 backend/data/chroma (실행 cwd에 영향을 받지 않도록)
+    - CHROMA_PERSIST_DIR 환경변수가 상대경로면 backend 루트 기준으로 해석합니다.
+    """
+    backend_root = Path(__file__).resolve().parents[1]
+    default_dir = backend_root / "data" / "chroma"
+    raw = os.getenv("CHROMA_PERSIST_DIR")
+    if not raw:
+        return str(default_dir)
+    p = Path(raw)
+    if not p.is_absolute():
+        p = backend_root / p
+    return str(p.resolve())
+
+
+CHROMA_PERSIST_DIR = _resolve_persist_dir()
 COLLECTION_NAME = "product_texts"
 
 
