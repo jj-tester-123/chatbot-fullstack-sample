@@ -10,6 +10,7 @@ import urllib.request
 import urllib.error
 import time
 from typing import Optional
+from dataclasses import dataclass
 
 # google-generativeai는 선택 의존성일 수 있으므로, import 실패 시에도
 # 서버가 기동될 수 있도록 방어적으로 처리합니다.
@@ -28,6 +29,60 @@ _gemini_model = None
 _gemini_model_name: Optional[str] = None
 _gemini_api_key: Optional[str] = None
 _use_rest_fallback: bool = False
+
+
+@dataclass(frozen=True)
+class _GeminiGenConfig:
+    temperature: float
+    top_p: float
+    max_output_tokens: int
+
+
+def _get_generation_config() -> _GeminiGenConfig:
+    """
+    generation 설정을 환경변수로 튜닝 가능하게 제공합니다.
+    - 일부 환경에서 SDK 응답이 비정상적으로 짧게 끊기는 경우가 있어 max token을 넉넉히 둡니다.
+    """
+    def _get_int(name: str, default: int) -> int:
+        try:
+            return int(os.getenv(name, str(default)))
+        except Exception:
+            return default
+
+    def _get_float(name: str, default: float) -> float:
+        try:
+            return float(os.getenv(name, str(default)))
+        except Exception:
+            return default
+
+    return _GeminiGenConfig(
+        temperature=_get_float("GEMINI_TEMPERATURE", 0.7),
+        top_p=_get_float("GEMINI_TOP_P", 0.9),
+        max_output_tokens=_get_int("GEMINI_MAX_OUTPUT_TOKENS", 1024),
+    )
+
+
+def _looks_truncated(text: str) -> bool:
+    """
+    Gemini 응답이 네트워크/SDK 이슈로 중간에 끊기는 케이스를 휴리스틱으로 감지합니다.
+    - 빈 문자열
+    - 괄호/따옴표가 열렸는데 닫히지 않음
+    """
+    if not text or not text.strip():
+        return True
+    s = text.strip()
+    # 괄호/따옴표 짝이 맞지 않으면 중간 끊김 가능성이 큼
+    if s.count("(") > s.count(")"):
+        return True
+    if s.count("[") > s.count("]"):
+        return True
+    if s.count("{") > s.count("}"):
+        return True
+    if s.count("\"") % 2 == 1:
+        return True
+    if s.count("'") % 2 == 1:
+        return True
+    return False
 
 
 def _mask_key(key: str) -> str:
@@ -54,12 +109,13 @@ def _rest_generate_content(prompt: str) -> str:
         f"models/{_gemini_model_name}:generateContent?key={_gemini_api_key}"
     )
 
+    cfg = _get_generation_config()
     payload = {
         "contents": [{"parts": [{"text": prompt}]}],
         "generationConfig": {
-            "temperature": 0.7,
-            "topP": 0.9,
-            "maxOutputTokens": 1024,
+            "temperature": cfg.temperature,
+            "topP": cfg.top_p,
+            "maxOutputTokens": cfg.max_output_tokens,
         },
     }
 
@@ -161,7 +217,8 @@ def init_gemini():
         return
     
     api_key = os.getenv("GEMINI_API_KEY")
-    model_name = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+    # 모델명은 환경변수로 관리 (기본값은 라이트 모델로 설정)
+    model_name = os.getenv("GEMINI_MODEL", "gemini-2.5-flash-lite")
     _gemini_api_key = api_key
     _gemini_model_name = model_name
     
@@ -205,19 +262,39 @@ async def generate_gemini(prompt: str) -> str:
     if _use_rest_fallback or genai is None or _gemini_model is None:
         return _rest_generate_content(prompt)
     
-    try:
-        # Gemini API 호출
+    cfg = _get_generation_config()
+
+    def _sdk_generate_once() -> str:
         response = _gemini_model.generate_content(
             prompt,
             generation_config=genai.types.GenerationConfig(
-                temperature=0.7,
-                top_p=0.9,
-                max_output_tokens=1024,
-            )
+                temperature=cfg.temperature,
+                top_p=cfg.top_p,
+                max_output_tokens=cfg.max_output_tokens,
+            ),
         )
-        
-        return response.text
-        
+        return getattr(response, "text", "") or ""
+
+    try:
+        # 1) SDK 1차 시도
+        text_1 = _sdk_generate_once()
+        if not _looks_truncated(text_1):
+            return text_1
+
+        logger.warning(
+            "Gemini SDK 응답이 비정상적으로 짧거나 끊긴 것으로 보입니다. REST 폴백을 시도합니다."
+        )
+
+        # 2) REST 폴백 1회(의도적으로 짧은 답이 아닌 경우가 많아 안정적)
+        if _gemini_api_key and _gemini_model_name:
+            text_2 = _rest_generate_content(prompt)
+            # 둘 중 더 완전한 답변을 반환
+            if not _looks_truncated(text_2):
+                return text_2
+            return text_2 if len(text_2) >= len(text_1) else text_1
+
+        return text_1
+
     except Exception as e:
         logger.error(f"Gemini 생성 실패: {str(e)}")
         # SDK 호출 실패 시에도 REST 폴백 시도 (가능하면)

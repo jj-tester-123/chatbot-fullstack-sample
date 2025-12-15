@@ -90,6 +90,10 @@ cp env.example .env
 # Gemini API 키 (필수: Gemini 엔진 사용 시)
 GEMINI_API_KEY=your_actual_gemini_api_key_here
 
+# Gemini 모델명 (선택)
+# 예: gemini-2.5-flash-lite, gemini-2.5-flash ...
+GEMINI_MODEL=gemini-2.5-flash-lite
+
 # Hugging Face 토큰 (선택사항, 공개 모델은 토큰 없이도 다운로드 가능)
 HF_TOKEN=your_huggingface_token_here
 

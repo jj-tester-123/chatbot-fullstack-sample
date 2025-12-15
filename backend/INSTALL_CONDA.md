@@ -70,7 +70,7 @@ pip install torch torchvision torchaudio --index-url https://download.pytorch.or
 
 ```bash
 cp env.example .env
-# .env 파일을 열어 GEMINI_API_KEY 설정
+# .env 파일을 열어 GEMINI_API_KEY 설정 (필요 시 GEMINI_MODEL도 변경)
 ```
 
 ## 7. 서버 실행
