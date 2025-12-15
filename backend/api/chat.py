@@ -6,6 +6,8 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 from typing import List, Optional
 import logging
+import re
+import os
 
 from rag.retriever import retrieve_context
 from llm.engine import generate_answer, get_available_engines
@@ -19,6 +21,67 @@ router = APIRouter()
 # 너무 높게 잡으면 "관련 컨텍스트가 있음에도" 폴백이 발생합니다.
 _MIN_CONTEXT_SCORE = 0.05  # 너무 약한 컨텍스트는 환각을 유발하기 쉬움
 _DIRECT_QNA_MIN_SCORE = 0.07  # QnA는 원문 답변을 그대로 쓰는 편이 정확/빠름
+_DIRECT_QNA_STRONG_SCORE = 0.18  # 매우 높은 점수면 직접 반환 허용
+
+
+def _load_csv_env(name: str, default: List[str]) -> List[str]:
+    """
+    콤마(,)로 구분된 환경변수를 리스트로 파싱합니다.
+    - 운영 중 튜닝을 위해 룰/키워드를 코드 하드코딩으로 두지 않습니다.
+    """
+    raw = os.getenv(name)
+    if not raw:
+        return default
+    parts = [p.strip() for p in raw.split(",")]
+    return [p for p in parts if p]
+
+
+# 키워드 휴리스틱 설정(운영 중 조정 가능)
+_QUERY_STOP_TOKENS = set(
+    _load_csv_env(
+        "CHAT_QUERY_STOP_TOKENS",
+        [
+            "이",
+            "그",
+            "저",
+            "것",
+            "거",
+            "수",
+            "좀",
+            "정도",
+            "관련",
+            "가능",
+            "여부",
+            "있나",
+            "있나요",
+            "있어",
+            "있어요",
+            "되나요",
+            "되나",
+            "인가",
+            "인가요",
+            "어떻게",
+            "왜",
+            "무엇",
+            "뭐",
+            "어떤",
+            "얼마",
+            "얼마나",
+            "해주세요",
+            "알려줘",
+            # 너무 일반적이라 단독 키워드로는 신뢰하기 어려움
+            "기능",
+        ],
+    )
+)
+
+_DIRECT_QNA_ENABLED = os.getenv("CHAT_DIRECT_QNA_ENABLED", "false").lower() in [
+    "1",
+    "true",
+    "yes",
+    "y",
+    "on",
+]
 
 
 def _no_rag_fallback_answer() -> str:
@@ -39,6 +102,40 @@ def _extract_qna_answer(content: str) -> Optional[str]:
         return None
     answer = content.split("A:", 1)[1].strip()
     return answer or None
+
+
+def _extract_qna_question(content: str) -> Optional[str]:
+    """product_texts.qna의 'Q: ...\\nA: ...' 포맷에서 Q만 추출"""
+    if not content or "Q:" not in content:
+        return None
+    q_part = content.split("Q:", 1)[1]
+    if "A:" in q_part:
+        q_part = q_part.split("A:", 1)[0]
+    q = q_part.strip()
+    return q or None
+
+
+def _keyword_overlap(query: str, text: str) -> bool:
+    """
+    간단 키워드 오버랩 휴리스틱.
+    - 임베딩이 과하게 매칭되어 엉뚱한 QnA가 top으로 오는 경우를 막기 위한 안전장치입니다.
+    """
+    if not query or not text:
+        return False
+
+    q = query.lower()
+    t = text.lower()
+
+    # 2글자 이상(한글/영문/숫자) 토큰만 사용
+    tokens = re.findall(r"[0-9a-z가-힣]{2,}", q)
+    if not tokens:
+        return False
+
+    tokens = [tok for tok in tokens if tok not in _QUERY_STOP_TOKENS]
+    if not tokens:
+        return False
+
+    return any(tok in t for tok in tokens)
 
 
 def _looks_like_template_garbage(answer: str) -> bool:
@@ -193,38 +290,41 @@ async def chat(request: ChatRequest):
             )
             return ChatResponse(
                 answer=_no_rag_fallback_answer(),
-                sources=[
-                    ContextSource(
-                        content=ctx["content"],
-                        type=ctx["type"],
-                        score=ctx["score"]
-                    )
-                    for ctx in contexts
-                ],
+                # 유사도가 낮은 컨텍스트는 '근거'로 제시하면 오히려 혼란을 유발하므로 숨깁니다.
+                sources=[],
                 engine=selected_engine,
                 product_id=request.product_id
             )
 
         # QnA 문서가 가장 유력하면 LLM을 거치지 않고 원문 답변을 바로 반환합니다.
-        # - 로컬 LLM은 느릴 수 있고, 환각/요약 실수 여지가 있습니다.
-        best_ctx = max(contexts, key=lambda c: c.get("score", 0.0))
-        if best_ctx.get("type") == "qna" and best_ctx.get("score", 0.0) >= _DIRECT_QNA_MIN_SCORE:
-            direct = _extract_qna_answer(best_ctx.get("content", ""))
-            if direct:
-                logger.info("QnA 원문 답변을 직접 반환합니다. (LLM 미사용)")
-                return ChatResponse(
-                    answer=direct,
-                    sources=[
-                        ContextSource(
-                            content=ctx["content"],
-                            type=ctx["type"],
-                            score=ctx["score"]
+        # NOTE: "QnA 직접 반환"은 질문 의도를 무시하는 단답을 만들기 쉬워 기본 비활성화합니다.
+        # 필요하면 CHAT_DIRECT_QNA_ENABLED=true 로 켤 수 있습니다.
+        if _DIRECT_QNA_ENABLED:
+            best_ctx = max(contexts, key=lambda c: c.get("score", 0.0))
+            if best_ctx.get("type") == "qna" and float(best_ctx.get("score", 0.0) or 0.0) >= _DIRECT_QNA_MIN_SCORE:
+                qna_content = best_ctx.get("content", "") or ""
+                qna_question = _extract_qna_question(qna_content) or ""
+                score = float(best_ctx.get("score", 0.0) or 0.0)
+
+                # 직접 반환은 매우 보수적으로: 질문 키워드가 QnA 질문(Q:)에 실제로 겹칠 때만 허용합니다.
+                # (답변(A:) 매칭까지 허용하면 "질문 의도 무시" 단답이 더 자주 발생합니다.)
+                if _keyword_overlap(request.query, qna_question) and score >= _DIRECT_QNA_STRONG_SCORE:
+                    direct = _extract_qna_answer(qna_content)
+                    if direct:
+                        logger.info("QnA 원문 답변을 직접 반환합니다. (LLM 미사용)")
+                        return ChatResponse(
+                            answer=direct,
+                            sources=[
+                                ContextSource(
+                                    content=ctx["content"],
+                                    type=ctx["type"],
+                                    score=ctx["score"]
+                                )
+                                for ctx in contexts
+                            ],
+                            engine=selected_engine,
+                            product_id=request.product_id
                         )
-                        for ctx in contexts
-                    ],
-                    engine=selected_engine,
-                    product_id=request.product_id
-                )
         
         # 2. Prompt 생성
         prompt = build_prompt(
@@ -245,7 +345,12 @@ async def chat(request: ChatRequest):
         # - 답변 불가 + Q&A 문의 안내로 안전하게 종료합니다.
         if _looks_like_template_garbage(answer):
             logger.warning("LLM 출력이 템플릿/메타 문구로 보입니다. Q&A 문의 안내로 폴백합니다.")
-            answer = _no_rag_fallback_answer()
+            return ChatResponse(
+                answer=_no_rag_fallback_answer(),
+                sources=[],
+                engine=selected_engine,
+                product_id=request.product_id
+            )
         
         # 4. 응답 구성
         sources = [
