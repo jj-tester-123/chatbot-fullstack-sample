@@ -83,8 +83,13 @@ def add_documents(documents: List[Dict[str, Any]]):
     contents = [doc["content"] for doc in documents]
     embeddings = get_embeddings(contents)
     
-    # ChromaDB에 추가(중복 ID가 있어도 경고/실패하지 않도록 upsert 사용)
-    ids = [f"{doc['product_id']}_{doc['original_id']}_{doc['chunk_index']}" for doc in documents]
+    # ChromaDB에 추가
+    # IMPORTANT: original_id는 각 테이블(products/order_reviews/product_qna)에서 1부터 다시 시작하므로,
+    # type을 포함하지 않으면 서로 다른 문서가 같은 ID를 가져 DuplicateIDError가 발생할 수 있습니다.
+    ids = [
+        f"{doc['product_id']}_{doc['type']}_{doc['original_id']}_{doc['chunk_index']}"
+        for doc in documents
+    ]
     metadatas = [
         {
             "product_id": str(doc["product_id"]),

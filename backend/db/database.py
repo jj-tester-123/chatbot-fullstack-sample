@@ -99,7 +99,20 @@ def init_db():
             seed_data(conn)
             logger.info("더미 데이터 시드 완료")
         else:
-            logger.info(f"기존 데이터 존재 ({count}개 상품), 시드 스킵")
+            logger.info(f"기존 데이터 존재 ({count}개 상품), 상품 시드 스킵")
+
+            # 기존 DB에 products만 있고 리뷰/QnA가 없는 경우가 있어, 비어 있으면 보조 시드를 수행합니다.
+            cursor.execute("SELECT COUNT(*) FROM order_reviews")
+            review_count = cursor.fetchone()[0]
+            cursor.execute("SELECT COUNT(*) FROM product_qna")
+            qna_count = cursor.fetchone()[0]
+
+            if review_count == 0 and qna_count == 0:
+                logger.info("리뷰/Q&A 데이터가 비어 있어 보조 더미 데이터를 시드합니다...")
+                seed_reviews_and_qnas(conn)
+                logger.info("리뷰/Q&A 보조 시드 완료")
+            else:
+                logger.info(f"리뷰/Q&A 데이터 존재 (reviews={review_count}, qna={qna_count}), 보조 시드 스킵")
             
     except Exception as e:
         logger.error(f"데이터베이스 초기화 실패: {str(e)}")
@@ -163,6 +176,24 @@ USB 3.2 Gen 2 규격으로 최대 10Gbps의 데이터 전송 속도를 제공합
     conn.commit()
     
     # order_reviews 데이터 (주문 리뷰)
+    _seed_reviews(cursor)
+    _seed_qnas(cursor)
+    conn.commit()
+
+
+def seed_reviews_and_qnas(conn):
+    """
+    보조 더미 데이터 삽입
+    - products는 유지하고, 리뷰/질문답변만 삽입합니다.
+    """
+    cursor = conn.cursor()
+    _seed_reviews(cursor)
+    _seed_qnas(cursor)
+    conn.commit()
+
+
+def _seed_reviews(cursor):
+    """order_reviews 더미 데이터 삽입"""
     reviews = [
         # 상품 1: 무선 블루투스 이어폰
         {
@@ -245,8 +276,10 @@ USB 3.2 Gen 2 규격으로 최대 10Gbps의 데이터 전송 속도를 제공합
             review["review_text"],
             review["rating"]
         ))
-    
-    # product_qna 데이터 (상품 QnA)
+
+
+def _seed_qnas(cursor):
+    """product_qna 더미 데이터 삽입"""
     qnas = [
         # 상품 1: 무선 블루투스 이어폰
         {
@@ -309,6 +342,4 @@ USB 3.2 Gen 2 규격으로 최대 10Gbps의 데이터 전송 속도를 제공합
             qna["question"],
             qna["answer"]
         ))
-    
-    conn.commit()
 

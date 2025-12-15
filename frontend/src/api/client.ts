@@ -18,13 +18,27 @@ export interface Product {
 }
 
 /**
- * 상품 텍스트
+ * 주문 리뷰
  */
-export interface ProductText {
+export interface Review {
   id: number;
   product_id: number;
-  type: string; // description, review, qna
-  content: string;
+  order_id?: number | null;
+  user_name?: string | null;
+  review_text: string;
+  rating?: number | null;
+  created_at: string;
+}
+
+/**
+ * 상품 Q&A
+ */
+export interface Qna {
+  id: number;
+  product_id: number;
+  question: string;
+  answer: string;
+  created_at: string;
 }
 
 /**
@@ -32,7 +46,8 @@ export interface ProductText {
  */
 export interface ProductDetail {
   product: Product;
-  texts: ProductText[];
+  reviews: Review[];
+  qnas: Qna[];
 }
 
 /**

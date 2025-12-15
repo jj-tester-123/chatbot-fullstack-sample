@@ -11,6 +11,17 @@ import type { ProductDetail } from '../api/client';
 import ChatBotPanel from '../components/ChatBotPanel';
 import './ProductDetail.css';
 
+function formatDate(value: string) {
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return value;
+  return d.toLocaleDateString();
+}
+
+function renderStars(rating?: number | null) {
+  const safe = typeof rating === 'number' ? Math.max(0, Math.min(5, rating)) : 0;
+  return '★'.repeat(safe) + '☆'.repeat(5 - safe);
+}
+
 export default function ProductDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -18,6 +29,8 @@ export default function ProductDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [chatOpen, setChatOpen] = useState(false);
+  const [showAllReviews, setShowAllReviews] = useState(false);
+  const [showAllQnas, setShowAllQnas] = useState(false);
 
   useEffect(() => {
     if (id) {
@@ -54,12 +67,11 @@ export default function ProductDetailPage() {
     );
   }
 
-  const { product: productInfo, texts } = product;
-
-  // 텍스트 타입별로 그룹화
-  const descriptions = texts.filter((t) => t.type === 'description');
-  const reviews = texts.filter((t) => t.type === 'review');
-  const qnas = texts.filter((t) => t.type === 'qna');
+  const { product: productInfo, reviews, qnas } = product;
+  const sortedReviews = [...reviews].sort((a, b) => b.id - a.id);
+  const sortedQnas = [...qnas].sort((a, b) => b.id - a.id);
+  const visibleReviews = showAllReviews ? sortedReviews : sortedReviews.slice(0, 5);
+  const visibleQnas = showAllQnas ? sortedQnas : sortedQnas.slice(0, 5);
 
   return (
     <div className="product-detail-container">
@@ -87,38 +99,103 @@ export default function ProductDetailPage() {
           </div>
         </div>
 
-        {descriptions.length > 0 && (
-          <section className="product-section">
+        <section className="product-section">
+          <div className="section-header">
+            <h2>상품 정보</h2>
+          </div>
+          <div className="product-spec-grid">
+            <div className="spec-item">
+              <span className="spec-label">카테고리</span>
+              <span className="spec-value">{productInfo.category || '-'}</span>
+            </div>
+            <div className="spec-item">
+              <span className="spec-label">상품번호</span>
+              <span className="spec-value">{productInfo.id}</span>
+            </div>
+            <div className="spec-item">
+              <span className="spec-label">가격</span>
+              <span className="spec-value">{productInfo.price.toLocaleString()}원</span>
+            </div>
+          </div>
+        </section>
+
+        <section className="product-section">
+          <div className="section-header">
             <h2>상세 설명</h2>
-            {descriptions.map((text) => (
-              <div key={text.id} className="text-content">
-                {text.content}
-              </div>
-            ))}
-          </section>
-        )}
+          </div>
+          <div className="text-content">{productInfo.description}</div>
+        </section>
 
-        {reviews.length > 0 && (
-          <section className="product-section">
+        <section className="product-section">
+          <div className="section-header">
             <h2>고객 리뷰</h2>
-            {reviews.map((text) => (
-              <div key={text.id} className="review-card">
-                {text.content}
-              </div>
-            ))}
-          </section>
-        )}
+            {sortedReviews.length > 5 && (
+              <button
+                type="button"
+                className="section-action"
+                onClick={() => setShowAllReviews((v) => !v)}
+              >
+                {showAllReviews ? '접기' : `더보기 (+${sortedReviews.length - 5})`}
+              </button>
+            )}
+          </div>
 
-        {qnas.length > 0 && (
-          <section className="product-section">
-            <h2>Q&A</h2>
-            {qnas.map((text) => (
-              <div key={text.id} className="qna-card">
-                {text.content}
-              </div>
-            ))}
-          </section>
-        )}
+          {sortedReviews.length === 0 ? (
+            <div className="empty-state">아직 리뷰가 없습니다.</div>
+          ) : (
+            <div className="card-list">
+              {visibleReviews.map((r) => (
+                <div key={r.id} className="review-card">
+                  <div className="card-meta">
+                    <span className="stars" aria-label={`별점 ${r.rating ?? 0}점`}>
+                      {renderStars(r.rating)}
+                    </span>
+                    <span className="meta-sep">·</span>
+                    <span className="meta-text">{r.user_name || '익명'}</span>
+                    <span className="meta-sep">·</span>
+                    <span className="meta-text">{formatDate(r.created_at)}</span>
+                  </div>
+                  <div className="card-body">{r.review_text}</div>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+
+        <section className="product-section">
+          <div className="section-header">
+            <h2>Q&amp;A</h2>
+            {sortedQnas.length > 5 && (
+              <button
+                type="button"
+                className="section-action"
+                onClick={() => setShowAllQnas((v) => !v)}
+              >
+                {showAllQnas ? '접기' : `더보기 (+${sortedQnas.length - 5})`}
+              </button>
+            )}
+          </div>
+
+          {sortedQnas.length === 0 ? (
+            <div className="empty-state">아직 등록된 Q&amp;A가 없습니다.</div>
+          ) : (
+            <div className="card-list">
+              {visibleQnas.map((q) => (
+                <div key={q.id} className="qna-card">
+                  <div className="card-meta">
+                    <span className="badge">Q</span>
+                    <span className="meta-text">{formatDate(q.created_at)}</span>
+                  </div>
+                  <div className="card-body qna-question">{q.question}</div>
+                  <div className="qna-answer">
+                    <span className="badge answer">A</span>
+                    <div className="card-body">{q.answer}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
       </div>
 
       {/* 챗봇 레이어 */}

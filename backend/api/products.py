@@ -7,7 +7,12 @@ from fastapi import APIRouter, HTTPException
 from typing import List
 from pydantic import BaseModel
 
-from db.repository import get_all_products, get_product_by_id, get_product_texts
+from db.repository import (
+    get_all_products,
+    get_product_by_id,
+    get_product_reviews,
+    get_product_qnas,
+)
 
 router = APIRouter()
 
@@ -30,10 +35,31 @@ class ProductText(BaseModel):
     content: str
 
 
+class Review(BaseModel):
+    """주문 리뷰"""
+    id: int
+    product_id: int
+    order_id: int | None = None
+    user_name: str | None = None
+    review_text: str
+    rating: int | None = None
+    created_at: str
+
+
+class Qna(BaseModel):
+    """상품 Q&A"""
+    id: int
+    product_id: int
+    question: str
+    answer: str
+    created_at: str
+
+
 class ProductDetail(BaseModel):
-    """상품 상세 정보 (기본 정보 + 텍스트 목록)"""
+    """상품 상세 정보 (기본 정보 + 리뷰/Q&A)"""
     product: Product
-    texts: List[ProductText]
+    reviews: List[Review]
+    qnas: List[Qna]
 
 
 @router.get("", response_model=List[Product])
@@ -55,11 +81,13 @@ async def get_product_detail(product_id: int):
     product = get_product_by_id(product_id)
     if not product:
         raise HTTPException(status_code=404, detail="상품을 찾을 수 없습니다.")
-    
-    texts = get_product_texts(product_id)
-    
+
+    reviews = get_product_reviews(product_id)
+    qnas = get_product_qnas(product_id)
+
     return ProductDetail(
         product=product,
-        texts=texts
+        reviews=reviews,
+        qnas=qnas,
     )
 
