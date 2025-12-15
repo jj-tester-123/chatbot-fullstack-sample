@@ -80,8 +80,8 @@ app.add_middleware(
 )
 
 # 라우터 등록
-app.include_router(products.router, prefix="/products", tags=["products"])
-app.include_router(chat.router, prefix="/chat", tags=["chat"])
+app.include_router(products.router, prefix="/api/products", tags=["products"])
+app.include_router(chat.router, prefix="/api/chat", tags=["chat"])
 
 
 @app.get("/")

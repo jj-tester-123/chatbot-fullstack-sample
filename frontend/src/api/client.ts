@@ -115,21 +115,21 @@ async function fetchApi<T>(
  * 상품 목록 조회
  */
 export async function getProducts(): Promise<Product[]> {
-  return fetchApi<Product[]>('/products');
+  return fetchApi<Product[]>('/api/products');
 }
 
 /**
  * 상품 상세 조회
  */
 export async function getProductDetail(productId: number): Promise<ProductDetail> {
-  return fetchApi<ProductDetail>(`/products/${productId}`);
+  return fetchApi<ProductDetail>(`/api/products/${productId}`);
 }
 
 /**
  * 챗봇 질의응답
  */
 export async function chat(request: ChatRequest): Promise<ChatResponse> {
-  return fetchApi<ChatResponse>('/chat', {
+  return fetchApi<ChatResponse>('/api/chat', {
     method: 'POST',
     body: JSON.stringify(request),
   });
