@@ -1,7 +1,7 @@
 /**
  * 챗봇 레이어 UI
  * - 질문 입력
- * - 엔진 선택 (gemini/local)
+ * - (엔진 선택 제거: Gemini만 사용)
  * - 응답 표시
  * - 소스 표시
  */
@@ -29,7 +29,6 @@ export default function ChatBotPanel({
 }: ChatBotPanelProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
-  const [engine, setEngine] = useState<'gemini' | 'local'>('gemini');
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -49,7 +48,6 @@ export default function ChatBotPanel({
       const response = await chat({
         query: userMessage,
         product_id: productId,
-        engine,
       });
 
       // 응답 메시지 추가
@@ -92,19 +90,7 @@ export default function ChatBotPanel({
         </div>
 
         {/* 엔진 선택 */}
-        <div className="engine-selector">
-          <label>
-            <span>AI 엔진:</span>
-            <select
-              value={engine}
-              onChange={(e) => setEngine(e.target.value as 'gemini' | 'local')}
-              disabled={loading}
-            >
-              <option value="gemini">Gemini (클라우드)</option>
-              <option value="local">로컬 LLM (Gemma-ko-2b)</option>
-            </select>
-          </label>
-        </div>
+        {/* Gemini만 사용 */}
 
         {/* 메시지 영역 */}
         <div className="messages-container">

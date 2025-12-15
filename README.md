@@ -6,7 +6,7 @@
 
 - **백엔드**: FastAPI + SQLite + ChromaDB
 - **프론트엔드**: Vite + React + TypeScript
-- **LLM 엔진**: Gemini API 또는 로컬 LLM (beomi/gemma-ko-2b)
+- **LLM 엔진**: Gemini API
 - **배포**: 로컬 실행 전용 (배포 고려 안 함)
 
 ## 주요 기능
@@ -14,15 +14,12 @@
 ### 백엔드
 - 상품 관리 API (목록, 상세)
 - RAG 파이프라인 (ChromaDB 벡터 검색)
-- LLM 엔진 스위칭 (Gemini ↔ 로컬 LLM)
 - product_id 범위 제한 검색
-- 자동 디바이스 선택 (cuda → mps → cpu)
 
 ### 프론트엔드
 - 상품 목록 페이지
 - 상품 상세 페이지
 - 챗봇 레이어 UI (모달)
-- LLM 엔진 선택 드롭다운
 - 대화 히스토리 및 소스 표시
 
 ## 프로젝트 구조
@@ -45,7 +42,6 @@ chatbot-fullstack/
 │   ├── llm/                   # LLM 엔진
 │   │   ├── prompt.py         # 공통 프롬프트
 │   │   ├── gemini_engine.py  # Gemini API
-│   │   ├── local_engine.py   # 로컬 LLM
 │   │   └── engine.py         # 엔진 통합
 │   ├── requirements.txt       # Python 의존성
 │   ├── env.example           # 환경 변수 예시
@@ -76,8 +72,6 @@ chatbot-fullstack/
 
 - **Python**: 3.9 이상
 - **Node.js**: 18 이상
-- **디스크 공간**: 최소 10GB (로컬 LLM 사용 시)
-- **메모리**: 최소 8GB RAM (로컬 LLM 사용 시 16GB 권장)
 
 ### 1. 백엔드 설정 및 실행
 
@@ -109,7 +103,6 @@ cp env.example .env
 **첫 실행 시**:
 - SQLite 데이터베이스 자동 생성 및 더미 데이터 시드
 - ChromaDB 인덱싱 자동 수행
-- 로컬 LLM 모델 다운로드 (약 5GB, 5~10분 소요)
 
 백엔드 서버: http://localhost:8000
 API 문서: http://localhost:8000/docs
@@ -149,10 +142,6 @@ GEMINI_API_KEY=your_actual_gemini_api_key_here
 # Hugging Face 토큰 (공개 모델은 불필요)
 HF_TOKEN=your_huggingface_token_here
 
-# 로컬 LLM 설정
-LOCAL_MODEL_ID=beomi/gemma-ko-2b
-LOCAL_MODEL_DEVICE=auto
-
 # 데이터베이스 경로
 DATABASE_PATH=./data/chatbot.db
 CHROMA_PERSIST_DIR=./data/chroma
@@ -182,30 +171,14 @@ VITE_API_BASE_URL=http://localhost:8000
 2. "AI 챗봇에게 물어보기" 버튼 클릭
 
 ### 3. 챗봇 사용
-1. **LLM 엔진 선택**:
-   - **Gemini (클라우드)**: 빠르고 정확 (권장)
-   - **로컬 LLM**: 오프라인 사용 가능 (느림)
-
-2. **질문 입력**:
+1. **질문 입력**:
    - "이 제품의 배터리는 얼마나 가나요?"
    - "방수 기능이 있나요?"
    - "다른 사용자들의 평가는 어떤가요?"
 
-3. **답변 확인**:
+2. **답변 확인**:
    - AI가 상품 데이터를 기반으로 답변
    - "참고한 정보" 클릭하여 출처 확인
-
-## LLM 엔진 비교
-
-| 특징 | Gemini (클라우드) | 로컬 LLM (Gemma-ko-2b) |
-|------|-------------------|------------------------|
-| 응답 속도 | 빠름 (1~3초) | 느림 (10~30초) |
-| 답변 품질 | 높음 | 보통 |
-| 인터넷 | 필요 | 불필요 |
-| 비용 | API 사용량 | 무료 |
-| 설정 | API 키 필요 | 모델 다운로드 (5GB) |
-| 하드웨어 | 일반 PC | GPU 권장 (CPU 가능) |
-| 권장 시나리오 | 일반적인 사용 | 오프라인, 데이터 보안 |
 
 ## 트러블슈팅
 
@@ -227,7 +200,6 @@ Gemini API가 초기화되지 않았습니다
 **해결**:
 - `.env` 파일의 `GEMINI_API_KEY` 확인
 - API 키 유효성 확인
-- 로컬 엔진으로 대체 사용
 
 ### 프론트엔드 오류
 
@@ -250,12 +222,6 @@ Gemini API가 초기화되지 않았습니다
 - CPU: 2코어 이상
 - RAM: 4GB
 - 디스크: 1GB
-
-### 권장 사양 (로컬 LLM 포함)
-- CPU: 4코어 이상
-- RAM: 16GB
-- GPU: NVIDIA GPU (8GB VRAM) 또는 Apple Silicon M1/M2/M3
-- 디스크: 10GB
 
 ## 추가 문서
 

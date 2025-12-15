@@ -47,7 +47,7 @@ async def lifespan(app: FastAPI):
     logger.info("데이터베이스 초기화 중...")
     init_db()
     
-    # 2. LLM 엔진 초기화 (로컬 모델 로드)
+    # 2. LLM 엔진 초기화 (Gemini)
     logger.info("LLM 엔진 초기화 중...")
     await init_llm_engines()
 

@@ -68,10 +68,6 @@ GEMINI_API_KEY=AIzaSy...여기에_키_붙여넣기
 - ✅ ChromaDB 벡터 인덱싱 자동 수행
 - ✅ 임베딩 모델 다운로드 (약 500MB)
 
-**로컬 LLM 사용 시 (선택사항)**:
-- ⏳ beomi/gemma-ko-2b 모델 다운로드 (약 5GB, 5~10분)
-- 💡 처음에는 Gemini만 사용하고, 나중에 로컬 LLM 시도 권장
-
 ## ✅ 정상 작동 확인
 
 ### 백엔드 확인
@@ -113,7 +109,7 @@ conda activate chatbot-backend
 → 백엔드가 실행 중인지 확인 (http://localhost:8000/health)
 
 ### 로컬 LLM이 너무 느려요
-→ 정상입니다! Gemini 엔진을 사용하세요 (챗봇 상단 드롭다운에서 선택)
+→ 로컬 LLM은 사용하지 않습니다. Gemini만 사용하세요.
 
 ## 📚 다음 단계
 
@@ -129,12 +125,7 @@ conda activate chatbot-backend
 - **상세 가이드**: [Conda 설치 가이드](backend/INSTALL_CONDA.md)
 
 ### Gemini만 사용하기 (권장)
-- 로컬 LLM은 다운로드 시간이 오래 걸리므로, 처음에는 Gemini만 사용
-- 챗봇에서 "Gemini (클라우드)" 선택
-
-### 로컬 LLM 나중에 시도하기
-- 백엔드가 정상 작동하면, 로컬 LLM은 백그라운드에서 자동 다운로드됨
-- 다운로드 완료 후 챗봇에서 "로컬 LLM" 선택 가능
+- Gemini만 사용합니다.
 
 ### 개발 모드 vs 프로덕션
 - 이 프로젝트는 **로컬 개발 전용**입니다

@@ -41,7 +41,6 @@ export interface ProductDetail {
 export interface ChatRequest {
   query: string;
   product_id: number;
-  engine: 'gemini' | 'local';
 }
 
 /**

@@ -6,9 +6,7 @@
 
 - **상품 관리 API**: 상품 목록 및 상세 정보 조회
 - **RAG 기반 챗봇**: ChromaDB를 사용한 벡터 검색 + LLM 응답 생성
-- **LLM 엔진 스위칭**: Gemini API ↔ 로컬 LLM (beomi/gemma-ko-2b) 선택 가능
 - **product_id 범위 제한**: 특정 상품에 대한 질문만 해당 상품 데이터에서 검색
-- **자동 디바이스 선택**: cuda → mps → cpu 순서로 자동 선택
 
 ## 프로젝트 구조
 
@@ -29,7 +27,6 @@ backend/
 ├── llm/                    # LLM 엔진
 │   ├── prompt.py          # 공통 프롬프트
 │   ├── gemini_engine.py   # Gemini API
-│   ├── local_engine.py    # 로컬 LLM (Transformers)
 │   └── engine.py          # 엔진 통합 인터페이스
 ├── requirements.txt        # Python 의존성
 ├── env.example            # 환경 변수 예시
@@ -96,10 +93,6 @@ GEMINI_API_KEY=your_actual_gemini_api_key_here
 # Hugging Face 토큰 (선택사항, 공개 모델은 토큰 없이도 다운로드 가능)
 HF_TOKEN=your_huggingface_token_here
 
-# 로컬 LLM 설정
-LOCAL_MODEL_ID=beomi/gemma-ko-2b
-LOCAL_MODEL_DEVICE=auto
-
 # 데이터베이스 및 ChromaDB 경로
 DATABASE_PATH=./data/chatbot.db
 CHROMA_PERSIST_DIR=./data/chroma
@@ -131,12 +124,6 @@ venv\Scripts\python -m uvicorn main:app --host 0.0.0.0 --port 8000
 - 헬스체크: http://localhost:8000/health
 
 ### 5. 첫 실행 시 주의사항
-
-**로컬 LLM 모델 다운로드**:
-- 첫 실행 시 `beomi/gemma-ko-2b` 모델을 Hugging Face에서 다운로드합니다 (약 5GB)
-- 다운로드는 자동으로 진행되며, 캐시 디렉토리(`~/.cache/huggingface/`)에 저장됩니다
-- 이후 실행 시에는 캐시된 모델을 사용하므로 빠르게 로드됩니다
-- 네트워크 속도에 따라 5~10분 소요될 수 있습니다
 
 **데이터베이스 초기화**:
 - 첫 실행 시 SQLite 데이터베이스와 더미 데이터가 자동으로 생성됩니다
@@ -224,67 +211,24 @@ RAG + LLM 기반 질의응답
 - `product_id`: 상품 ID (필수, 검색 범위 제한)
 - `engine`: LLM 엔진 선택 (필수)
   - `"gemini"`: Gemini API 사용
-  - `"local"`: 로컬 LLM 사용 (beomi/gemma-ko-2b)
-
-## LLM 엔진 선택 가이드
-
-### Gemini API (권장)
-- **장점**: 빠른 응답, 높은 품질, 설정 간단
-- **단점**: API 키 필요, 인터넷 연결 필요, 사용량 제한
-- **사용 시나리오**: 프로덕션 환경, 빠른 프로토타이핑
-
-### 로컬 LLM (beomi/gemma-ko-2b)
-- **장점**: 오프라인 사용 가능, 비용 없음, 데이터 프라이버시
-- **단점**: 초기 다운로드 필요(5GB), GPU 권장, 응답 속도 느림
-- **사용 시나리오**: 오프라인 환경, 데이터 보안 중요, 비용 절감
-
-### 디바이스 선택 (로컬 LLM)
-로컬 LLM은 다음 순서로 자동 선택됩니다:
-1. **CUDA** (NVIDIA GPU): 가장 빠름
-2. **MPS** (Apple Silicon M1/M2/M3): 빠름
-3. **CPU**: 느림 (권장하지 않음)
 
 ## 트러블슈팅
 
-### 1. 로컬 모델 로드 실패
-```
-로컬 모델 로드 실패: ...
-```
-**해결 방법**:
-- 인터넷 연결 확인 (첫 실행 시 다운로드 필요)
-- 디스크 공간 확인 (최소 10GB 필요)
-- Hugging Face 토큰 설정 (일부 모델의 경우)
-- Gemini 엔진으로 대체 사용
-
-### 2. Gemini API 오류
+### 1. Gemini API 오류
 ```
 Gemini API가 초기화되지 않았습니다.
 ```
 **해결 방법**:
 - `.env` 파일에 `GEMINI_API_KEY` 설정 확인
 - API 키 유효성 확인
-- 로컬 엔진으로 대체 사용
 
-### 3. ChromaDB 오류
+### 2. ChromaDB 오류
 ```
 ChromaDB 초기화 실패
 ```
 **해결 방법**:
 - `./data/chroma` 디렉토리 삭제 후 재시작
 - 디스크 공간 확인
-
-### 4. 메모리 부족 (로컬 LLM)
-**해결 방법**:
-- GPU 메모리 확인 (최소 8GB 권장)
-- CPU 사용 시 RAM 확인 (최소 16GB 권장)
-- Gemini 엔진으로 대체 사용
-
-## 성능 최적화
-
-### 로컬 LLM 성능 향상
-1. **GPU 사용**: CUDA 또는 MPS 활성화
-2. **모델 양자화**: 메모리 절약 (추후 구현 가능)
-3. **배치 크기 조정**: `max_new_tokens` 파라미터 조정
 
 ### RAG 검색 성능 향상
 1. **청크 크기 조정**: `rag/chunker.py`의 `chunk_size` 파라미터

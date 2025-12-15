@@ -10,7 +10,6 @@ import logging
 from rag.retriever import retrieve_context
 from llm.engine import generate_answer, get_available_engines
 from llm.prompt import build_prompt
-from llm.local_engine import init_local_model, is_local_model_available
 
 logger = logging.getLogger(__name__)
 
@@ -44,7 +43,7 @@ def _extract_qna_answer(content: str) -> Optional[str]:
 
 def _looks_like_template_garbage(answer: str) -> bool:
     """
-    로컬 LLM이 프롬프트의 템플릿/설명 문구를 복사해버린 경우를 탐지.
+    LLM이 프롬프트의 템플릿/설명 문구를 복사해버린 경우를 탐지.
     (예: [type] 반복, '답변 내용에 포함된 정보' 같은 메타 설명 반복 등)
     """
     if not answer:
@@ -119,7 +118,7 @@ class ChatRequest(BaseModel):
     """챗봇 요청"""
     query: str = Field(..., description="사용자 질문")
     product_id: int = Field(..., description="상품 ID (검색 범위 제한)")
-    engine: str = Field(default="gemini", description="LLM 엔진 선택: 'gemini' 또는 'local'")
+    engine: str = Field(default="gemini", description="LLM 엔진 선택: 'gemini'")
 
 
 class ContextSource(BaseModel):
@@ -144,32 +143,19 @@ async def chat(request: ChatRequest):
     
     1. product_id로 범위를 제한하여 ChromaDB에서 관련 컨텍스트 검색
     2. 검색된 컨텍스트를 prompt에 포함
-    3. 선택된 엔진(gemini/local)으로 LLM 응답 생성
+    3. 선택된 엔진(gemini)으로 LLM 응답 생성
     """
     try:
         # 엔진 검증
-        if request.engine not in ["gemini", "local"]:
+        if request.engine != "gemini":
             raise HTTPException(
                 status_code=400,
-                detail="engine은 'gemini' 또는 'local'이어야 합니다."
+                detail="engine은 'gemini'여야 합니다."
             )
 
         # 엔진 가용성 확인 (폴백 금지: 요청한 엔진을 그대로 사용)
         available = get_available_engines()
         selected_engine = request.engine
-        if selected_engine == "local" and not available.get("local", False):
-            # 서버 시작 시 로컬 로드가 실패/지연될 수 있으므로, 요청 시 한 번 더 초기화를 시도합니다.
-            init_local_model()
-            if not is_local_model_available():
-                raise HTTPException(
-                    status_code=503,
-                    detail=(
-                        "현재 local 엔진을 사용할 수 없습니다. (로컬 모델 로드 실패/미초기화) "
-                        "서버 시작 로그의 local_engine 오류를 확인하세요. "
-                        "방금 transformers/tokenizers를 업그레이드했다면, 패키지 교체는 프로세스 재시작이 필요합니다."
-                    ),
-                )
-            available["local"] = True
         if selected_engine == "gemini" and not available.get("gemini", False):
             raise HTTPException(
                 status_code=503,
@@ -254,7 +240,7 @@ async def chat(request: ChatRequest):
             engine=selected_engine
         )
 
-        # 로컬 LLM이 템플릿/설명 문구를 그대로 복사해버리는 경우:
+        # LLM이 템플릿/설명 문구를 그대로 복사해버리는 경우:
         # - 잘못된/무의미한 답변을 그대로 노출하지 않고,
         # - 답변 불가 + Q&A 문의 안내로 안전하게 종료합니다.
         if _looks_like_template_garbage(answer):
@@ -280,7 +266,10 @@ async def chat(request: ChatRequest):
             product_id=request.product_id
         )
         
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error(f"챗봇 처리 중 오류: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"챗봇 처리 중 오류가 발생했습니다: {str(e)}")
+        # 보안: 내부 예외 메시지/스택을 클라이언트에 그대로 노출하지 않습니다.
+        logger.exception("챗봇 처리 중 오류")
+        raise HTTPException(status_code=500, detail="챗봇 처리 중 오류가 발생했습니다.")
 
