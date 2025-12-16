@@ -1,17 +1,12 @@
 """
-RAG 인덱싱 워커
+개발 환경 부트스트랩 스크립트
+- DB 스키마 초기화 (+선택적 reset)
+- 더미 데이터 시드
+- RAG 인덱싱 (선택)
 
 사용 예:
   cd backend
-  ./venv/bin/python -m worker.rag_index --clear
-
-옵션:
-  --product-ids 1,2,3   특정 상품만 인덱싱
-  --clear / --no-clear  컬렉션 초기화 여부
-
-보안:
-- 이 워커는 LLM API 키가 필요하지 않습니다(임베딩은 로컬 모델 사용).
-- 다만 환경변수(.env)에 포함된 키가 로그로 노출되지 않도록 주의하세요.
+  ./venv/bin/python -m worker.bootstrap_dev --clear
 """
 
 from __future__ import annotations
@@ -24,6 +19,7 @@ from typing import List, Optional
 from dotenv import load_dotenv
 
 from db.database import init_db
+from worker.dev_seed import seed_dummies_if_needed
 from rag.indexer import index_products
 
 
@@ -46,10 +42,28 @@ def main() -> int:
     logging.getLogger("chromadb").setLevel(logging.ERROR)
     logging.getLogger("sentence_transformers").setLevel(logging.ERROR)
 
-    # 로컬 개발 편의를 위해 .env를 자동 로드합니다.
     load_dotenv()
 
-    parser = argparse.ArgumentParser(description="RAG 인덱싱 워커 (ChromaDB 재구축/업데이트)")
+    parser = argparse.ArgumentParser(
+        description="개발용: DB 초기화/더미 시드 + (선택) RAG 인덱싱을 한 번에 수행합니다."
+    )
+    parser.add_argument(
+        "--no-reset-db",
+        dest="reset_db",
+        action="store_false",
+        help="DB 테이블 드롭을 건너뜁니다 (기존 데이터 유지). 기본: reset 후 재생성.",
+    )
+    parser.add_argument(
+        "--no-seed-dummies",
+        dest="seed_dummies",
+        action="store_false",
+        help="더미 데이터 시드를 건너뜁니다. 기본: 더미 데이터 시드.",
+    )
+    parser.add_argument(
+        "--skip-index",
+        action="store_true",
+        help="DB 초기화/시드만 수행하고 RAG 인덱싱은 건너뜁니다.",
+    )
     parser.add_argument(
         "--product-ids",
         default=None,
@@ -67,13 +81,17 @@ def main() -> int:
         action="store_false",
         help="기존 컬렉션을 유지한 채 upsert합니다.",
     )
-    parser.set_defaults(clear=None)
+    parser.set_defaults(reset_db=True, seed_dummies=True, clear=None)
 
     args = parser.parse_args()
 
-    # 워커는 DB 스키마가 없으면 실패하므로 초기화 보장 (더미 시드는 별도 수행)
-    logger.info("DB 스키마 확인 중... (더미 데이터는 worker.bootstrap_dev로 시드)")
-    init_db()
+    logger.info("DB 초기화 (reset_db=%s)", args.reset_db)
+    init_db(reset=args.reset_db)
+    seed_dummies_if_needed(args.seed_dummies)
+
+    if args.skip_index:
+        logger.info("RAG 인덱싱을 건너뜁니다 (--skip-index).")
+        return 0
 
     product_ids = _parse_product_ids(args.product_ids)
     clear_on_index = args.clear
@@ -88,7 +106,7 @@ def main() -> int:
 
     logger.info("RAG 인덱싱 시작 (product_ids=%s, clear_on_index=%s)", product_ids, clear_on_index)
     stats = index_products(product_ids=product_ids, clear_on_index=clear_on_index)
-    logger.info("RAG 인덱싱 종료: %s", stats)
+    logger.info("RAG 인덱싱 완료: %s", stats)
     return 0
 
 

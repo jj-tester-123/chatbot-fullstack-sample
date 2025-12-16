@@ -27,14 +27,17 @@ cp env.example .env
 
 ```
 
-### 1.5단계: (필수) RAG 인덱싱 워커 실행
+### 1.5단계: (필수) 더미 데이터 + RAG 인덱스 부트스트랩
 
-API 서버는 **인덱싱(임베딩/벡터DB 업서트)을 자동으로 수행하지 않습니다.**
-채팅이 근거를 찾도록 하려면 아래 워커를 최소 1회 실행해 주세요.
+백엔드는 실행 시 DB를 자동 시드/인덱싱하지 않습니다.
+아래 명령으로 **DB 초기화 → 더미 데이터 시드 → RAG 인덱싱**을 한 번에 수행하세요.
 
 ```bash
 cd backend
-python -m worker.rag_index --clear
+python -m worker.bootstrap_dev --clear
+
+# 컬렉션을 지우지 않고 upsert만 하고 싶다면
+# python -m worker.bootstrap_dev --no-clear
 ```
 
 ### 1.6단계: 백엔드 서버 실행
@@ -78,10 +81,9 @@ GEMINI_API_KEY=AIzaSy...여기에_키_붙여넣기
 ## 🎯 첫 실행 시 주의사항
 
 ### 백엔드 첫 실행 (약 2~3분 소요)
-- ✅ SQLite 데이터베이스 자동 생성
-- ✅ 더미 상품 데이터 자동 삽입
-- ✅ (워커 실행 시) ChromaDB 벡터 인덱싱 수행
-- ✅ (워커 실행 시) 임베딩 모델 다운로드 (약 500MB)
+- ✅ `python -m worker.bootstrap_dev` 실행 시 SQLite 생성 및 더미 데이터 삽입
+- ✅ 같은 명령으로 ChromaDB 벡터 인덱싱 수행 (기본: --clear)
+- ✅ 임베딩 모델 다운로드 (최초 1회, 약 500MB)
 
 ## ✅ 정상 작동 확인
 
@@ -149,4 +151,3 @@ conda activate chatbot-backend
 ---
 
 **문제가 있나요?** [전체 문서](README.md)의 트러블슈팅 섹션을 확인하세요!
-

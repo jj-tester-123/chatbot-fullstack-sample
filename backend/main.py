@@ -42,7 +42,7 @@ async def lifespan(app: FastAPI):
     """앱 시작/종료 시 실행되는 로직"""
     logger.info("애플리케이션 시작 중...")
     
-    # 1. DB 초기화 (테이블 생성 + 더미 데이터 seed)
+    # 1. DB 스키마 확인 (데이터 시드/리셋은 worker.bootstrap_dev 사용)
     logger.info("데이터베이스 초기화 중...")
     init_db()
     
@@ -95,4 +95,3 @@ async def health_check():
         "database": "connected",
         "llm": "ready"
     }
-

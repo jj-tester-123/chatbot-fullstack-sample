@@ -106,20 +106,28 @@ CHROMA_PERSIST_DIR=./data/chroma
 - `.env` 파일은 절대 Git에 커밋하지 마세요 (`.gitignore`에 포함됨)
 - API 키는 소스 코드에 하드코딩하지 마세요
 - Gemini API 키는 [Google AI Studio](https://makersuite.google.com/app/apikey)에서 발급받을 수 있습니다
+### 4. (필수) 개발용 부트스트랩: 더미 데이터 + RAG 인덱스
 
-### 4. (필수) RAG 인덱싱 워커 실행
-
-API 서버는 **인덱싱(임베딩 생성/벡터DB 업서트)을 자동으로 수행하지 않습니다.**
-채팅이 정상적으로 근거를 찾으려면 아래 워커를 최소 1회 실행해 주세요.
+API 서버는 DB 시드/인덱싱을 자동으로 수행하지 않습니다.
+아래 명령으로 **DB 초기화 → 더미 데이터 시드 → RAG 인덱싱**을 한 번에 수행하세요.
 
 ```bash
 cd backend
 
-# 전체 재인덱싱(권장)
-./venv/bin/python -m worker.rag_index --clear
+# 기본: DB reset + 더미 시드 + 인덱스 재구축(--clear)
+./venv/bin/python -m worker.bootstrap_dev --clear
+
+# DB를 유지하고 싶다면
+# ./venv/bin/python -m worker.bootstrap_dev --no-reset-db --clear
+
+# Chroma 컬렉션을 비우지 않고 upsert만 하려면
+# ./venv/bin/python -m worker.bootstrap_dev --no-clear
 
 # Windows
-venv\Scripts\python -m worker.rag_index --clear
+venv\Scripts\python -m worker.bootstrap_dev --clear
+
+# RAG 인덱싱만 별도로 수행하려면 기존 워커를 사용하세요
+# ./venv/bin/python -m worker.rag_index --clear
 ```
 
 ### 5. 서버 실행
@@ -145,11 +153,11 @@ venv\Scripts\python -m uvicorn main:app --host 0.0.0.0 --port 8000
 ### 6. 첫 실행 시 주의사항
 
 **데이터베이스 초기화**:
-- 첫 실행 시 SQLite 데이터베이스와 더미 데이터가 자동으로 생성됩니다
-- `./data/chatbot.db` 파일이 생성됩니다
+- `python -m worker.bootstrap_dev` 실행 시 SQLite 데이터베이스가 생성됩니다 (`./data/chatbot.db`)
+- 기본 동작은 DB를 리셋하고 더미 데이터를 다시 시드합니다. 기존 데이터를 유지하려면 `--no-reset-db`를 사용하세요.
 
 **ChromaDB 인덱싱**:
-- 상품 텍스트 임베딩 및 ChromaDB 저장은 **워커(`python -m worker.rag_index`)** 가 수행합니다
+- 상품 텍스트 임베딩 및 ChromaDB 저장은 **워커(`python -m worker.bootstrap_dev` 또는 `python -m worker.rag_index`)** 가 수행합니다
 - 이후 실행 시에는 저장된 인덱스를 재사용합니다
 
 ## API 엔드포인트
@@ -276,4 +284,3 @@ curl -X POST http://localhost:8000/chat \
 ## 기여
 
 이슈 및 풀 리퀘스트를 환영합니다!
-

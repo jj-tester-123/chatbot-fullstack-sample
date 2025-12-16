@@ -96,13 +96,16 @@ source venv/bin/activate  # Windows: venv\Scripts\activate
 cp env.example .env
 # .env 파일을 열어 GEMINI_API_KEY 설정 (필수)
 
-# 5. 서버 실행
+# 5. (필수) 개발용 데이터/인덱스 준비
+./venv/bin/python -m worker.bootstrap_dev --clear
+
+# 6. 서버 실행
 ./venv/bin/python -m uvicorn main:app --reload --host 0.0.0.0 --port 8000
 ```
 
 **첫 실행 시**:
-- SQLite 데이터베이스 자동 생성 및 더미 데이터 시드
-- ChromaDB 인덱싱 자동 수행
+- `python -m worker.bootstrap_dev`가 SQLite 생성 + 더미 데이터 시드 + ChromaDB 인덱싱을 한 번에 수행합니다.
+- 이후에는 필요할 때만 부트스트랩/인덱싱 명령을 다시 실행하세요.
 
 백엔드 서버: http://localhost:8000
 API 문서: http://localhost:8000/docs
@@ -285,4 +288,3 @@ curl -X POST http://localhost:8000/chat \
 ---
 
 **Happy Coding!**
-
