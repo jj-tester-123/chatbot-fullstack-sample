@@ -99,7 +99,7 @@ def get_product_reviews(product_id: int) -> List[Dict[str, Any]]:
     cursor = conn.cursor()
     cursor.execute(
         """
-        SELECT id, product_id, order_id, user_name, review_text, rating, created_at
+        SELECT id, product_id, user_name, review_text, rating, created_at
         FROM order_reviews
         WHERE product_id = ?
         ORDER BY datetime(created_at) DESC, id DESC
@@ -244,4 +244,3 @@ def get_product_texts_by_ids(product_ids: List[int]) -> List[Dict[str, Any]]:
     conn.close()
     
     return texts
-

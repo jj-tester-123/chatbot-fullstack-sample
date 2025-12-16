@@ -39,7 +39,6 @@ class Review(BaseModel):
     """주문 리뷰"""
     id: int
     product_id: int
-    order_id: int | None = None
     user_name: str | None = None
     review_text: str
     rating: int | None = None
@@ -90,4 +89,3 @@ async def get_product_detail(product_id: int):
         reviews=reviews,
         qnas=qnas,
     )
-

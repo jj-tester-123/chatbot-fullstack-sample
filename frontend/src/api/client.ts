@@ -23,7 +23,6 @@ export interface Product {
 export interface Review {
   id: number;
   product_id: number;
-  order_id?: number | null;
   user_name?: string | null;
   review_text: string;
   rating?: number | null;
@@ -148,4 +147,3 @@ export async function chat(request: ChatRequest): Promise<ChatResponse> {
     body: JSON.stringify(request),
   });
 }
-
