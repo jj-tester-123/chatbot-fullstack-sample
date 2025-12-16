@@ -5,7 +5,7 @@
  * - 응답 표시
  * - 소스 표시
  */
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { chat } from '../api/client';
 import type { ChatResponse } from '../api/client';
 import './ChatBotPanel.css';
@@ -30,6 +30,14 @@ export default function ChatBotPanel({
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // 로딩이 끝나면 입력 필드에 포커스
+  useEffect(() => {
+    if (!loading && inputRef.current) {
+      inputRef.current.focus();
+    }
+  }, [loading]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -153,6 +161,7 @@ export default function ChatBotPanel({
         {/* 입력 영역 */}
         <form className="input-form" onSubmit={handleSubmit}>
           <input
+            ref={inputRef}
             type="text"
             value={input}
             onChange={(e) => setInput(e.target.value)}
