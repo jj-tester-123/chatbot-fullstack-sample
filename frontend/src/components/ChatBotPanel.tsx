@@ -39,26 +39,19 @@ export default function ChatBotPanel({
     }
   }, [loading]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!input.trim() || loading) return;
+  const submitQuestion = async (question: string) => {
+    if (!question.trim() || loading) return;
 
-    const userMessage = input.trim();
-    setInput('');
-
-    // 사용자 메시지 추가
+    const userMessage = question.trim();
     setMessages((prev) => [...prev, { role: 'user', content: userMessage }]);
     setLoading(true);
 
     try {
-      // API 호출
       const response = await chat({
         query: userMessage,
         product_id: productId,
       });
 
-      // 응답 메시지 추가
       setMessages((prev) => [
         ...prev,
         {
@@ -68,7 +61,6 @@ export default function ChatBotPanel({
         },
       ]);
     } catch (error) {
-      // 에러 메시지 추가
       setMessages((prev) => [
         ...prev,
         {
@@ -82,6 +74,36 @@ export default function ChatBotPanel({
       setLoading(false);
     }
   };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!input.trim() || loading) return;
+
+    const userMessage = input.trim();
+    setInput('');
+
+    await submitQuestion(userMessage);
+  };
+
+  const handleQuickQuestion = async (question: string) => {
+    setInput('');
+    await submitQuestion(question);
+  };
+
+  const quickQuestions = (() => {
+    const base = `${productName} 핵심 특징을 알려줘`;
+
+    if (productName.includes('이불')) {
+      return [base, `${productName} 세탁 방법을 알려줘`];
+    }
+
+    if (productName.includes('쌀국수')) {
+      return [base, `${productName} 소비기한이 어떻게 되나요?`];
+    }
+
+    return [base, `${productName} 배송/교환은 어떻게 되나요?`];
+  })();
 
   return (
     <div className="chatbot-overlay" onClick={onClose}>
@@ -100,11 +122,27 @@ export default function ChatBotPanel({
         {/* 엔진 선택 */}
         {/* Gemini만 사용 */}
 
-        {/* 메시지 영역 */}
         <div className="messages-container">
           {messages.length === 0 && (
             <div className="welcome-message">
               <p>안녕하세요! 이 상품에 대해 궁금한 점을 물어보세요.</p>
+              <div className="quick-questions">
+                <div className="quick-questions-header">
+                  바로 알아보기
+                </div>
+                <div className="quick-questions-buttons">
+                  {quickQuestions.map((q) => (
+                    <button
+                      key={q}
+                      type="button"
+                      onClick={() => handleQuickQuestion(q)}
+                      disabled={loading}
+                    >
+                      {q}
+                    </button>
+                  ))}
+                </div>
+              </div>
               <div className="example-questions">
                 <p>예시 질문:</p>
                 <ul>
@@ -176,4 +214,3 @@ export default function ChatBotPanel({
     </div>
   );
 }
-
