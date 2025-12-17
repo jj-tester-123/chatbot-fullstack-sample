@@ -45,9 +45,10 @@ export default function ChatBotPanel({
     if (!question.trim() || loading) return;
 
     const userMessage = question.trim();
+    const nextAskedQuestions = [...askedQuestions, userMessage];
 
     // 히스토리에 추가
-    setAskedQuestions((prev) => [...prev, userMessage]);
+    setAskedQuestions(nextAskedQuestions);
 
     setMessages((prev) => [...prev, { role: 'user', content: userMessage }]);
     setLoading(true);
@@ -56,7 +57,7 @@ export default function ChatBotPanel({
       const response = await chat({
         query: userMessage,
         product_id: productId,
-        conversation_history: askedQuestions,
+        conversation_history: nextAskedQuestions,
       });
 
       setMessages((prev) => [
@@ -100,18 +101,37 @@ export default function ChatBotPanel({
   };
 
   const quickQuestions = (() => {
-    const base = `${productName} 핵심 특징을 알려줘`;
+    const base = `${productName} 핵심 특징을 알려주세요`;
 
     if (productName.includes('이불')) {
-      return [base, `${productName} 세탁 방법을 알려줘`];
+      return [
+        `${productName} 소재는 무엇인가요?`,
+        `${productName} 세탁/관리 방법은 어떻게 되나요?`,
+        `${productName} 사이즈/구성 옵션을 알려주세요`,
+        `${productName} 두께감/계절감은 어떤가요?`,
+        '배송/교환/반품은 어떻게 되나요?',
+      ];
     }
 
     if (productName.includes('쌀국수')) {
-      return [base, `${productName} 소비기한이 어떻게 되나요?`];
+      return [
+        `${productName} 조리 방법을 알려주세요`,
+        `${productName} 매운 정도가 어떤가요?`,
+        `${productName} 보관/유통기한은 어떻게 되나요?`,
+        `${productName} 1인분 기준 양이 어느 정도인가요?`,
+        '배송/교환/반품은 어떻게 되나요?',
+      ];
     }
 
-    return [base, `${productName} 배송/교환은 어떻게 되나요?`];
+    return [
+      base,
+      `${productName} 구성품/옵션은 어떻게 되나요?`,
+      `${productName} 사이즈/무게는 어느 정도인가요?`,
+      `${productName} 사용/관리 방법을 알려주세요`,
+      '배송/교환/반품은 어떻게 되나요?',
+    ];
   })();
+  const quickQuestionPreview = quickQuestions.slice(0, 2);
 
   return (
     <div className="chatbot-overlay" onClick={onClose}>
@@ -139,7 +159,7 @@ export default function ChatBotPanel({
                   바로 알아보기
                 </div>
                 <div className="quick-questions-buttons">
-                  {quickQuestions.map((q) => (
+                  {quickQuestionPreview.map((q) => (
                     <button
                       key={q}
                       type="button"

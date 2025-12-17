@@ -22,7 +22,6 @@ router = APIRouter()
 _MIN_CONTEXT_SCORE = 0.05  # 너무 약한 컨텍스트는 환각을 유발하기 쉬움
 _DIRECT_QNA_MIN_SCORE = 0.07  # QnA는 원문 답변을 그대로 쓰는 편이 정확/빠름
 _DIRECT_QNA_STRONG_SCORE = 0.18  # 매우 높은 점수면 직접 반환 허용
-_SUGGESTED_QNA_MIN_SCORE = 0.12  # 추천 질문 최소 유사도
 
 
 def _load_csv_env(name: str, default: List[str]) -> List[str]:
@@ -139,6 +138,25 @@ def _keyword_overlap(query: str, text: str) -> bool:
     return any(tok in t for tok in tokens)
 
 
+def _question_match_score(query: str, question: str) -> int:
+    """사용자 질문과 FAQ 질문 간의 간단 매칭 점수."""
+    if not query or not question:
+        return 0
+
+    q = query.lower()
+    t = question.lower()
+
+    tokens = re.findall(r"[0-9a-z가-힣]{2,}", q)
+    if not tokens:
+        return 0
+
+    tokens = [tok for tok in tokens if tok not in _QUERY_STOP_TOKENS]
+    if not tokens:
+        return 0
+
+    return sum(1 for tok in tokens if tok in t)
+
+
 def _looks_like_template_garbage(answer: str) -> bool:
     """
     LLM이 프롬프트의 템플릿/설명 문구를 복사해버린 경우를 탐지.
@@ -214,33 +232,45 @@ def _summarize_key_features_from_contexts(contexts: List[dict]) -> str:
 
 
 def _get_default_questions(product_id: int) -> List[str]:
-    """상품별 기본 추천 질문 (폴백용)"""
+    """상품별 기본 FAQ 질문"""
     from db.repository import get_product_by_id
 
     product = get_product_by_id(product_id)
     if not product:
         return [
-            "이 제품의 주요 특징은 무엇인가요?",
-            "배송은 얼마나 걸리나요?"
+            "이 제품의 핵심 특징을 알려주세요",
+            "구성품/옵션은 어떻게 되나요?",
+            "사이즈/무게는 어느 정도인가요?",
+            "사용/관리 방법을 알려주세요",
+            "배송/교환/반품은 어떻게 되나요?"
         ]
 
     product_name = product.get("name", "제품")
 
-    # 제품명 기반 기본 질문 (기존 quickQuestions 로직과 유사)
+    # 제품명 기반 FAQ 질문
     if "이불" in product_name:
         return [
-            f"{product_name} 세탁 방법을 알려주세요",
-            f"{product_name} 소재는 어떻게 되나요?"
+            f"{product_name} 소재는 무엇인가요?",
+            f"{product_name} 세탁/관리 방법은 어떻게 되나요?",
+            f"{product_name} 사이즈/구성 옵션을 알려주세요",
+            f"{product_name} 두께감/계절감은 어떤가요?",
+            "배송/교환/반품은 어떻게 되나요?"
         ]
     elif "쌀국수" in product_name:
         return [
             f"{product_name} 조리 방법을 알려주세요",
-            f"{product_name} 보관 방법이 어떻게 되나요?"
+            f"{product_name} 매운 정도가 어떤가요?",
+            f"{product_name} 보관/유통기한은 어떻게 되나요?",
+            f"{product_name} 1인분 기준 양이 어느 정도인가요?",
+            "배송/교환/반품은 어떻게 되나요?"
         ]
     else:
         return [
-            f"{product_name}의 핵심 특징을 알려주세요",
-            "배송/교환은 어떻게 되나요?"
+            f"{product_name} 핵심 특징을 알려주세요",
+            f"{product_name} 구성품/옵션은 어떻게 되나요?",
+            f"{product_name} 사이즈/무게는 어느 정도인가요?",
+            f"{product_name} 사용/관리 방법을 알려주세요",
+            "배송/교환/반품은 어떻게 되나요?"
         ]
 
 
@@ -250,46 +280,20 @@ def _suggest_related_questions(
     asked_questions: List[str],
     top_k: int = 2
 ) -> List[str]:
-    """사용자 질문과 관련된 QnA 질문 추천"""
-    from rag.vector_store import search_documents_by_type
+    """사용자 질문과 관련된 FAQ 질문 추천"""
+    defaults = _get_default_questions(product_id)
+    candidates = [q for q in defaults if q not in asked_questions]
+    if not candidates:
+        return []
 
-    # 1. QnA 타입만 검색 (충분한 후보 확보)
-    qna_results = search_documents_by_type(
-        query=user_query,
-        product_id=product_id,
-        text_type="qna",
-        top_k=10
-    )
+    scored = [
+        (question, _question_match_score(user_query, question), idx)
+        for idx, question in enumerate(candidates)
+    ]
 
-    # 2. 유사도 필터링 및 질문 추출
-    candidates = []
-    for result in qna_results:
-        score = result.get("score", 0.0)
-        if score < _SUGGESTED_QNA_MIN_SCORE:
-            continue
-
-        content = result.get("content", "")
-        question = _extract_qna_question(content)
-        if not question:
-            continue
-
-        # 이미 물어본 질문 제외
-        if question in asked_questions:
-            continue
-
-        candidates.append((question, score))
-
-    # 3. 점수 높은 순으로 정렬 후 top_k개 선택
-    candidates.sort(key=lambda x: x[1], reverse=True)
-    suggested = [q for q, _ in candidates[:top_k]]
-
-    # 4. 부족하면 기본 질문으로 채우기
-    if len(suggested) < top_k:
-        defaults = _get_default_questions(product_id)
-        defaults = [q for q in defaults if q not in asked_questions]
-        suggested.extend(defaults[:top_k - len(suggested)])
-
-    return suggested[:top_k]
+    scored.sort(key=lambda x: (-x[1], x[2]))
+    suggested = [q for q, _, _ in scored[:top_k]]
+    return suggested
 
 
 class ChatRequest(BaseModel):
@@ -472,4 +476,3 @@ async def chat(request: ChatRequest):
         # 보안: 내부 예외 메시지/스택을 클라이언트에 그대로 노출하지 않습니다.
         logger.exception("챗봇 처리 중 오류")
         raise HTTPException(status_code=500, detail="챗봇 처리 중 오류가 발생했습니다.")
-

@@ -30,6 +30,7 @@ describe('ChatBotPanel', () => {
       sources: [],
       engine: 'gemini',
       product_id: 1,
+      suggested_questions: [],
     });
 
     render(<ChatBotPanel {...mockProps} />);
@@ -59,6 +60,7 @@ describe('ChatBotPanel', () => {
       expect(client.chat).toHaveBeenCalledWith({
         query: '테스트 질문입니다',
         product_id: 1,
+        conversation_history: ['테스트 질문입니다'],
       });
     });
 
@@ -80,6 +82,7 @@ describe('ChatBotPanel', () => {
       sources: [],
       engine: 'gemini',
       product_id: 1,
+      suggested_questions: [],
     });
 
     render(<ChatBotPanel {...mockProps} />);
@@ -106,6 +109,7 @@ describe('ChatBotPanel', () => {
       sources: [],
       engine: 'gemini',
       product_id: 1,
+      suggested_questions: [],
     });
 
     // 두 번째 메시지를 바로 입력할 수 있어야 함 (클릭 없이)
