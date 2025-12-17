@@ -36,6 +36,12 @@ _PRICE_MAP = {
     "noodle_001": 1200,
     "sidiz_t20": 239000,
 }
+_IMAGE_MAP = {
+    "blanket_001": "/images/products/blanket_001.jpg",
+    "monitor_001": "/images/products/monitor_001.avif",
+    "noodle_001": "/images/products/noodle_001.avif",
+    "sidiz_t20": "/images/products/sidiz_t20.jpg",
+}
 
 
 def _dummy_root() -> Path:
@@ -94,7 +100,7 @@ def _load_dummy_products():
                 "category": meta.get("category", "기타"),
                 "description": _compose_description(meta),
                 "price": _PRICE_MAP.get(slug, 10000),
-                "image_url": f"https://via.placeholder.com/400x400?text={slug}",
+                "image_url": _IMAGE_MAP.get(slug, f"/images/products/{slug}.jpg"),
             }
         )
 
