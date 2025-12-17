@@ -386,3 +386,49 @@
   opacity: 0.5;
   cursor: not-allowed;
 }
+
+/* 추천 질문 컨테이너 (AI 답변 아래) */
+.suggested-questions {
+  margin-top: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.suggested-questions-header {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #555;
+}
+
+.suggested-questions-buttons {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.suggested-questions-buttons button {
+  border: 1px solid #d7dbff;
+  background: #f5f6ff;
+  color: #3c3f8f;
+  padding: 0.5rem 0.75rem;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-weight: 500;
+  font-size: 0.85rem;
+  text-align: left;
+  max-width: 100%;
+  word-wrap: break-word;
+}
+
+.suggested-questions-buttons button:hover:not(:disabled) {
+  background: #ebedff;
+  border-color: #c2c7ff;
+  transform: translateY(-1px);
+}
+
+.suggested-questions-buttons button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}

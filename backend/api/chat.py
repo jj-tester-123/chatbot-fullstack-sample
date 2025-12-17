@@ -22,6 +22,7 @@ router = APIRouter()
 _MIN_CONTEXT_SCORE = 0.05  # 너무 약한 컨텍스트는 환각을 유발하기 쉬움
 _DIRECT_QNA_MIN_SCORE = 0.07  # QnA는 원문 답변을 그대로 쓰는 편이 정확/빠름
 _DIRECT_QNA_STRONG_SCORE = 0.18  # 매우 높은 점수면 직접 반환 허용
+_SUGGESTED_QNA_MIN_SCORE = 0.12  # 추천 질문 최소 유사도
 
 
 def _load_csv_env(name: str, default: List[str]) -> List[str]:
@@ -211,11 +212,95 @@ def _summarize_key_features_from_contexts(contexts: List[dict]) -> str:
     bullet = "\n".join([f"- {f}" for f in features[:5]])
     return f"주요 특징은 아래와 같습니다.\n{bullet}"
 
+
+def _get_default_questions(product_id: int) -> List[str]:
+    """상품별 기본 추천 질문 (폴백용)"""
+    from db.repository import get_product_by_id
+
+    product = get_product_by_id(product_id)
+    if not product:
+        return [
+            "이 제품의 주요 특징은 무엇인가요?",
+            "배송은 얼마나 걸리나요?"
+        ]
+
+    product_name = product.get("name", "제품")
+
+    # 제품명 기반 기본 질문 (기존 quickQuestions 로직과 유사)
+    if "이불" in product_name:
+        return [
+            f"{product_name} 세탁 방법을 알려주세요",
+            f"{product_name} 소재는 어떻게 되나요?"
+        ]
+    elif "쌀국수" in product_name:
+        return [
+            f"{product_name} 조리 방법을 알려주세요",
+            f"{product_name} 보관 방법이 어떻게 되나요?"
+        ]
+    else:
+        return [
+            f"{product_name}의 핵심 특징을 알려주세요",
+            "배송/교환은 어떻게 되나요?"
+        ]
+
+
+def _suggest_related_questions(
+    user_query: str,
+    product_id: int,
+    asked_questions: List[str],
+    top_k: int = 2
+) -> List[str]:
+    """사용자 질문과 관련된 QnA 질문 추천"""
+    from rag.vector_store import search_documents_by_type
+
+    # 1. QnA 타입만 검색 (충분한 후보 확보)
+    qna_results = search_documents_by_type(
+        query=user_query,
+        product_id=product_id,
+        text_type="qna",
+        top_k=10
+    )
+
+    # 2. 유사도 필터링 및 질문 추출
+    candidates = []
+    for result in qna_results:
+        score = result.get("score", 0.0)
+        if score < _SUGGESTED_QNA_MIN_SCORE:
+            continue
+
+        content = result.get("content", "")
+        question = _extract_qna_question(content)
+        if not question:
+            continue
+
+        # 이미 물어본 질문 제외
+        if question in asked_questions:
+            continue
+
+        candidates.append((question, score))
+
+    # 3. 점수 높은 순으로 정렬 후 top_k개 선택
+    candidates.sort(key=lambda x: x[1], reverse=True)
+    suggested = [q for q, _ in candidates[:top_k]]
+
+    # 4. 부족하면 기본 질문으로 채우기
+    if len(suggested) < top_k:
+        defaults = _get_default_questions(product_id)
+        defaults = [q for q in defaults if q not in asked_questions]
+        suggested.extend(defaults[:top_k - len(suggested)])
+
+    return suggested[:top_k]
+
+
 class ChatRequest(BaseModel):
     """챗봇 요청"""
     query: str = Field(..., description="사용자 질문")
     product_id: int = Field(..., description="상품 ID (검색 범위 제한)")
     engine: str = Field(default="gemini", description="LLM 엔진 선택: 'gemini'")
+    conversation_history: List[str] = Field(
+        default=[],
+        description="이미 물어본 질문 리스트 (중복 방지용)"
+    )
 
 
 class ContextSource(BaseModel):
@@ -231,6 +316,7 @@ class ChatResponse(BaseModel):
     sources: List[ContextSource]
     engine: str
     product_id: int
+    suggested_questions: List[str] = []
 
 
 @router.post("", response_model=ChatResponse)
@@ -361,14 +447,23 @@ async def chat(request: ChatRequest):
             )
             for ctx in contexts
         ]
-        
+
+        # 5. 추천 질문 생성
+        suggested = _suggest_related_questions(
+            user_query=request.query,
+            product_id=request.product_id,
+            asked_questions=request.conversation_history,
+            top_k=2
+        )
+
         logger.info("답변 생성 완료")
-        
+
         return ChatResponse(
             answer=answer,
             sources=sources,
             engine=selected_engine,
-            product_id=request.product_id
+            product_id=request.product_id,
+            suggested_questions=suggested
         )
         
     except HTTPException:

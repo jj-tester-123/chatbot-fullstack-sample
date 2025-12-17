@@ -184,6 +184,56 @@ def search_documents(
     return documents
 
 
+def search_documents_by_type(
+    query: str,
+    product_id: int,
+    text_type: str,
+    top_k: int = 5
+) -> List[Dict[str, Any]]:
+    """
+    타입별 벡터 검색 (product_id + type 필터링)
+
+    Args:
+        query: 검색 쿼리
+        product_id: 상품 ID (필터)
+        text_type: 텍스트 타입 ('qna', 'review', 'description')
+        top_k: 반환할 문서 수
+
+    Returns:
+        검색 결과 리스트
+    """
+    collection = get_collection()
+
+    # 쿼리 임베딩 생성
+    query_embedding = get_embedding(query)
+
+    # ChromaDB 검색 (product_id + type 필터 적용)
+    results = collection.query(
+        query_embeddings=[query_embedding],
+        n_results=top_k,
+        where={
+            "$and": [
+                {"product_id": str(product_id)},
+                {"type": text_type}
+            ]
+        }
+    )
+
+    # 결과 파싱
+    documents = []
+    if results["ids"] and results["ids"][0]:
+        for i in range(len(results["ids"][0])):
+            distance = results["distances"][0][i]
+            documents.append({
+                "content": results["documents"][0][i],
+                "type": results["metadatas"][0][i]["type"],
+                "score": 1.0 / (1.0 + float(distance)),
+                "product_id": int(results["metadatas"][0][i]["product_id"])
+            })
+
+    return documents
+
+
 def clear_collection():
     """컬렉션 초기화 (모든 문서 삭제)"""
     global _collection

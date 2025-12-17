@@ -55,6 +55,7 @@ export interface ProductDetail {
 export interface ChatRequest {
   query: string;
   product_id: number;
+  conversation_history?: string[];
 }
 
 /**
@@ -74,6 +75,7 @@ export interface ChatResponse {
   sources: ContextSource[];
   engine: string;
   product_id: number;
+  suggested_questions: string[];
 }
 
 /**

@@ -20,6 +20,7 @@ interface Message {
   role: 'user' | 'assistant';
   content: string;
   sources?: ChatResponse['sources'];
+  suggestedQuestions?: string[];
 }
 
 export default function ChatBotPanel({
@@ -30,6 +31,7 @@ export default function ChatBotPanel({
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
+  const [askedQuestions, setAskedQuestions] = useState<string[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
 
   // 로딩이 끝나면 입력 필드에 포커스
@@ -43,6 +45,10 @@ export default function ChatBotPanel({
     if (!question.trim() || loading) return;
 
     const userMessage = question.trim();
+
+    // 히스토리에 추가
+    setAskedQuestions((prev) => [...prev, userMessage]);
+
     setMessages((prev) => [...prev, { role: 'user', content: userMessage }]);
     setLoading(true);
 
@@ -50,6 +56,7 @@ export default function ChatBotPanel({
       const response = await chat({
         query: userMessage,
         product_id: productId,
+        conversation_history: askedQuestions,
       });
 
       setMessages((prev) => [
@@ -58,6 +65,7 @@ export default function ChatBotPanel({
           role: 'assistant',
           content: response.answer,
           sources: response.sources,
+          suggestedQuestions: response.suggested_questions,
         },
       ]);
     } catch (error) {
@@ -178,6 +186,29 @@ export default function ChatBotPanel({
                       ))}
                     </div>
                   </details>
+                </div>
+              )}
+
+              {/* 추천 질문 표시 */}
+              {message.role === 'assistant' &&
+               message.suggestedQuestions &&
+               message.suggestedQuestions.length > 0 && (
+                <div className="suggested-questions">
+                  <div className="suggested-questions-header">
+                    관련 질문
+                  </div>
+                  <div className="suggested-questions-buttons">
+                    {message.suggestedQuestions.map((q, idx) => (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => handleQuickQuestion(q)}
+                        disabled={loading}
+                      >
+                        {q}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               )}
             </div>
