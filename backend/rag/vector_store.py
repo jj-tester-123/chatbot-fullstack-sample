@@ -172,13 +172,18 @@ def search_documents(
         for i in range(len(results["ids"][0])):
             distance = results["distances"][0][i]
             documents.append({
+                # Chroma 문서 고유 ID (업서트 시 생성한 id)
+                "source_id": results["ids"][0][i],
                 "content": results["documents"][0][i],
                 "type": results["metadatas"][0][i]["type"],
                 # Chroma distance는 메트릭/데이터에 따라 1보다 커질 수 있으므로,
                 # (1 - distance) 같은 단순 변환은 음수 유사도를 만들어 가드 로직을 망가뜨립니다.
                 # 안전한 정규화: similarity = 1 / (1 + distance) ∈ (0, 1]
                 "score": 1.0 / (1.0 + float(distance)),
-                "product_id": int(results["metadatas"][0][i]["product_id"])
+                "product_id": int(results["metadatas"][0][i]["product_id"]),
+                # 디버깅/추적용 메타데이터
+                "original_id": int(results["metadatas"][0][i].get("original_id") or 0),
+                "chunk_index": int(results["metadatas"][0][i].get("chunk_index") or 0),
             })
     
     return documents
@@ -225,10 +230,13 @@ def search_documents_by_type(
         for i in range(len(results["ids"][0])):
             distance = results["distances"][0][i]
             documents.append({
+                "source_id": results["ids"][0][i],
                 "content": results["documents"][0][i],
                 "type": results["metadatas"][0][i]["type"],
                 "score": 1.0 / (1.0 + float(distance)),
-                "product_id": int(results["metadatas"][0][i]["product_id"])
+                "product_id": int(results["metadatas"][0][i]["product_id"]),
+                "original_id": int(results["metadatas"][0][i].get("original_id") or 0),
+                "chunk_index": int(results["metadatas"][0][i].get("chunk_index") or 0),
             })
 
     return documents

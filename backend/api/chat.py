@@ -8,10 +8,11 @@ from typing import List, Optional
 import logging
 import re
 import os
+import json
 
 from rag.retriever import retrieve_context
 from llm.engine import generate_answer, get_available_engines
-from llm.prompt import build_prompt
+from llm.prompt import build_prompt, build_prompt_with_source_selection
 
 logger = logging.getLogger(__name__)
 
@@ -185,6 +186,41 @@ def _looks_like_template_garbage(answer: str) -> bool:
     return False
 
 
+def _extract_json_object(text: str) -> Optional[dict]:
+    """
+    LLM 출력에서 JSON 오브젝트를 최대한 안전하게 추출합니다.
+    - 코드펜스가 섞여도 제거 시도
+    - 앞뒤 잡문이 있어도 첫 '{' ~ 마지막 '}' 범위 파싱 시도
+    """
+    if not text:
+        return None
+    s = text.strip()
+
+    # 코드펜스 제거 (```json ... ```)
+    if s.startswith("```"):
+        s = re.sub(r"^```[a-zA-Z0-9_-]*\s*", "", s)
+        s = re.sub(r"\s*```$", "", s).strip()
+
+    # 1차: 전체를 JSON으로 파싱
+    try:
+        obj = json.loads(s)
+        return obj if isinstance(obj, dict) else None
+    except Exception:
+        pass
+
+    # 2차: 첫 { ~ 마지막 }만 파싱
+    start = s.find("{")
+    end = s.rfind("}")
+    if start == -1 or end == -1 or end <= start:
+        return None
+    candidate = s[start : end + 1]
+    try:
+        obj = json.loads(candidate)
+        return obj if isinstance(obj, dict) else None
+    except Exception:
+        return None
+
+
 def _summarize_key_features_from_contexts(contexts: List[dict]) -> str:
     """
     LLM이 이상한 답을 내놓을 때, RAG 컨텍스트만으로 규칙 기반 요약을 생성.
@@ -309,6 +345,7 @@ class ChatRequest(BaseModel):
 
 class ContextSource(BaseModel):
     """검색된 컨텍스트 소스"""
+    source_id: str
     content: str
     type: str  # description, review, qna
     score: float
@@ -406,18 +443,18 @@ async def chat(request: ChatRequest):
                             answer=direct,
                             sources=[
                                 ContextSource(
-                                    content=ctx["content"],
-                                    type=ctx["type"],
-                                    score=ctx["score"]
+                                    source_id=str(best_ctx.get("source_id") or ""),
+                                    content=best_ctx.get("content", "") or "",
+                                    type=best_ctx.get("type", "") or "",
+                                    score=float(best_ctx.get("score", 0.0) or 0.0),
                                 )
-                                for ctx in contexts
                             ],
                             engine=selected_engine,
                             product_id=request.product_id
                         )
         
         # 2. Prompt 생성
-        prompt = build_prompt(
+        prompt = build_prompt_with_source_selection(
             query=request.query,
             contexts=contexts,
             product_id=request.product_id
@@ -429,6 +466,20 @@ async def chat(request: ChatRequest):
             prompt=prompt,
             engine=selected_engine
         )
+
+        # LLM 출력(JSON)에서 answer + 실제 사용한 source_id 목록을 추출합니다.
+        used_source_ids: List[str] = []
+        parsed = _extract_json_object(answer)
+        if parsed is not None:
+            parsed_answer = parsed.get("answer")
+            parsed_used = parsed.get("used_source_ids")
+            if isinstance(parsed_answer, str) and parsed_answer.strip():
+                answer = parsed_answer.strip()
+            if isinstance(parsed_used, list):
+                used_source_ids = [str(x) for x in parsed_used if str(x).strip()]
+        else:
+            # JSON 파싱 실패 시: sources는 안전하게 숨김(검색만 된 근거를 "참고한 정보"로 보여주지 않기 위함)
+            logger.warning("LLM JSON 파싱 실패: sources를 숨깁니다.")
 
         # LLM이 템플릿/설명 문구를 그대로 복사해버리는 경우:
         # - 잘못된/무의미한 답변을 그대로 노출하지 않고,
@@ -443,13 +494,17 @@ async def chat(request: ChatRequest):
             )
         
         # 4. 응답 구성
+        # LLM이 실제로 사용했다고 명시한 source_id만 "참고한 정보"로 노출합니다.
+        used_set = set(used_source_ids)
+        used_contexts = [ctx for ctx in contexts if str(ctx.get("source_id") or "") in used_set]
         sources = [
             ContextSource(
-                content=ctx["content"],
-                type=ctx["type"],
-                score=ctx["score"]
+                source_id=str(ctx.get("source_id") or ""),
+                content=ctx.get("content", "") or "",
+                type=ctx.get("type", "") or "",
+                score=float(ctx.get("score", 0.0) or 0.0),
             )
-            for ctx in contexts
+            for ctx in used_contexts
         ]
 
         # 5. 추천 질문 생성
